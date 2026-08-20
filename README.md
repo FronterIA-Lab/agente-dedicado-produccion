@@ -3,6 +3,7 @@ agente asistente gerencia producción planta industrial
 
 
 Tu objetivo es crear un sistema RAG quequede empaquetado, listo para enviar.
+Es para el gerente de producción de la empresa Pro-Automation
 Este es el objetivo:
 **Arquitectura de Agente RAG** diseñada específicamente para este contexto:
 
