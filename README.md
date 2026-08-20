@@ -7,6 +7,9 @@ Es para el gerente de producción de la empresa Pro-Automation
 Este es el objetivo:
 **Arquitectura de Agente RAG** diseñada específicamente para este contexto:
 
+--DESCARGA LA DOCUMENTACIÓN NECESARIA--
+
+
 ---
 
 ### 1. Capa de Conocimiento (El "Cerebro" RAG)
