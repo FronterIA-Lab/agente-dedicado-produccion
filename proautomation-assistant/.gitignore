@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.streamlit/secrets.toml
+models/*.gguf
+models/*.gguf.part
+data/vector_store/
+*.part
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
