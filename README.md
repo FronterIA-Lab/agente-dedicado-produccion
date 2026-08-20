@@ -73,6 +73,126 @@ Debes configurar el *System Prompt* de la siguiente manera para evitar riesgos:
    - *"Propongo una celda robótica con brazo de 6 ejes, fuente de poder pulsada (para minimizar salpicadura en galvanizado), y un sistema de enganche rápido de herramienta. Para cumplir con la AWS D1.1, debemos calificar el procedimiento de soldadura (WPS) con las muestras de su material. Adjunto un borrador de carta de presentación con estos argumentos y un cronograma tentativo de 16 semanas para entrega llave en mano. ¿Quieres que ajuste los tiempos?"*
 
 ---
+
+Esta es mi propuesta de arquitectura.
+🧩 Arquitectura RAG para ProAutomation – Versión Ligera (CPU)
+
+1. Requisitos de Hardware Mínimos (para el gerente)
+
+CPU: Intel Core i5 / AMD Ryzen 5 (o equivalente)
+RAM: 8 GB (16 GB recomendado)
+Almacenamiento: 10 GB libres (para modelos y documentos)
+No se necesita GPU.
+Sistema operativo: Windows 10/11, macOS o Linux (usaremos herramientas multiplataforma).
+2. Componentes Técnicos
+
+🧠 Modelo de Lenguaje (LLM) – CPU nativo
+
+Usaremos modelos cuantizados en formato GGUF que corren eficientemente en CPU gracias a la librería llama-cpp-python.
+
+Recomendado: Phi-3-mini-4k-instruct.Q4_K_M.gguf (3.8B parámetros, ~2.5 GB) – muy bueno en razonamiento y seguimiento de instrucciones.
+Alternativa: Qwen2-1.5B-Instruct.Q4_K_M.gguf (más ligero, ~1 GB) si el hardware es justo.
+Embeddings: all-MiniLM-L6-v2 (modelo de Hugging Face, 384 dimensiones, ~80 MB) – ligero y rápido.
+🗄️ Base de Datos Vectorial – en memoria / local
+
+Usaremos ChromaDB en modo persistente (guarda en disco) o FAISS con índice plano. Chroma es más fácil de manejar para el gerente.
+
+🧩 Framework de Orquestación
+
+LangChain con integración con llama-cpp-python para el LLM y Chroma para la base vectorial. Es flexible y permite implementar fácilmente las herramientas del asistente.
+
+📦 Empaquetado e Instalación
+
+Opción A (más sencilla): Crear un script Python que instale las dependencias y descargue los modelos automáticamente. El gerente solo ejecuta pip install -r requirements.txt y luego python app.py.
+Opción B (más profesional): Empaquetar con PyInstaller un solo ejecutable (.exe para Windows). Esto oculta la complejidad pero puede hacer el archivo más pesado.
+Opción C: Usar Ollama (instalador simple) y configurar el RAG para que se conecte a la API local de Ollama, mientras el código de la aplicación maneja la base vectorial y las herramientas. Esto da una instalación en dos pasos.
+🖥️ Interfaz de Usuario
+
+Streamlit – genera una interfaz web local (accesible desde el navegador) con apenas unas líneas de código. El gerente solo abre http://localhost:8501 después de ejecutar el script.
+Alternativa: Gradio (similar) o una interfaz CLI para los más técnicos.
+3. Integración del MCC en el Flujo del Asistente
+
+El MCC no es solo un "prompt", sino una metodología de interacción. Implementaremos sus cuatro capas como pasos guiados que el asistente ejecuta o sugiere al gerente.
+
+🔹 Capa 1 – Declaración de Contexto
+
+En el sistema: Al iniciar una conversación, el asistente preguntará al gerente:
+"¿Cuál es la situación de este cliente? (industria, volumen, restricciones técnicas, plazo, presupuesto aproximado)"
+Estas respuestas se almacenan como metadatos de la sesión y se inyectan en cada consulta posterior.
+🔹 Capa 2 – Bifurcación de Output
+
+Herramienta: el asistente puede ofrecer botones/opciones:
+"Dame dos enfoques: uno técnico-óptimo y otro con menor inversión inicial"
+"Muestra la contra-argumentación que podría hacer el cliente"
+Esto se implementa como funciones que generan múltiples respuestas divergentes y las presenta en paralelo.
+🔹 Capa 3 – Verificación de Certeza
+
+Integración: Después de dar una respuesta, el asistente etiqueta automáticamente las afirmaciones que no están respaldadas por los documentos cargados (usando un sistema de citas). Además, puede activar un modo "Pregúntame algo que ya sepas para calibrar mi confianza" (KNOWN_PROBE) como parte del onboarding.
+🔹 Capa 4 – Extracción de Frameworks
+
+Herramienta: El asistente puede, a petición, transformar su respuesta en un marco de decisión (lista de criterios, preguntas clave, variables a evaluar) en lugar de una solución cerrada. Por ejemplo:
+"En lugar de darte la celda final, te doy los 5 criterios que debes evaluar con el cliente para definirla".
+⚙️ Implementación Técnica
+
+Estas capas se implementan como componentes del prompt que se añaden dinámicamente según el modo seleccionado por el gerente (a través de la interfaz).
+Las herramientas (Generador de Propuestas, Calculador de Costos, etc.) se programan como funciones Python que el asistente puede invocar (usando @tool de LangChain) cuando el contexto lo requiere.
+4. Estructura de Archivos para la Aplicación
+
+text
+proautomation-assistant/
+├── app.py               # Punto de entrada (Streamlit)
+├── rag_engine.py        # Lógica de RAG (carga de documentos, embeddings, búsqueda)
+├── tools.py             # Herramientas (propuestas, costos, preguntas, manuales)
+├── mcc_handler.py       # Lógica de los pasos del MCC
+├── config.py            # Configuración (rutas, modelos, etc.)
+├── requirements.txt     # Dependencias
+├── data/
+│   ├── docs/            # PDFs y documentos de los 4 módulos (se incluyen pre-procesados)
+│   └── vector_store/    # Donde Chroma guarda los índices (creado automáticamente)
+├── models/
+│   └── phi-3-mini.Q4_K_M.gguf   # (descargado automáticamente o incluido)
+└── README.md            # Instrucciones para el gerente
+5. Pasos Concretos para Construir el Sistema
+
+Preparar los documentos:
+
+Tomar los PDFs de los cuatro módulos y convertirlos a texto (o usar pypdf para cargarlos directamente).
+Crear un script de ingesta que divida en fragmentos (chunks), genere embeddings con all-MiniLM-L6-v2 y los guarde en Chroma con metadatos (módulo, tipo, etc.).
+Configurar el LLM local:
+
+Instalar llama-cpp-python y descargar el modelo GGUF de Hugging Face (con un script que lo haga automáticamente).
+Crear un wrapper para que LangChain pueda usarlo.
+Desarrollar el motor RAG:
+
+Función query(query_text, metadata_filter=None) que:
+
+Recupera los fragmentos más relevantes de Chroma (usando el filtro de metadatos si se especifica).
+Construye un prompt con el contexto y la pregunta.
+Llama al LLM y devuelve la respuesta + las fuentes.
+Implementar las herramientas del MCC y las funciones de negocio:
+
+generar_propuesta(cliente_info): usa RAG para extraer capacidades, luego genera el borrador.
+calcular_costo(especificaciones): reglas simples + datos históricos.
+generar_preguntas(industria): prompt específico.
+etc.
+Construir la interfaz en Streamlit:
+
+Un chat con opciones laterales para cambiar el "modo" (ejecutivo/técnico, idioma, capa MCC activa).
+Botones para invocar las herramientas directamente.
+Visualización de fuentes y citas.
+Empaquetar y documentar:
+
+Escribir un README.md con instrucciones claras: instalar Python, crear entorno virtual, ejecutar pip install -r requirements.txt, luego streamlit run app.py.
+Opcional: usar pyinstaller para generar un .exe que incluya todo.
+6. Consideraciones para el Gerente (usuario final)
+
+La primera ejecución tardará unos minutos en descargar los modelos (si no están incluidos) y construir el índice vectorial.
+Después, la respuesta será casi instantánea (1-3 segundos en CPU moderna).
+Todo funciona sin Internet una vez descargados los modelos y documentos.
+El sistema es seguro porque los datos nunca salen de su computadora.
+
+----------------
+
 Te deajré algunos pdfs en documentos. 
 
 Esta arquitectura convierte al asistente en un **Multiplicador de Fuerza Comercial**, permitiendo que el gerente responda RFQs complejos en minutos, se anticipe a objeciones técnicas y presente una imagen de ultra-especialización, todo sin pisar el piso de producción del cliente.
