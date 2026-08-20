@@ -1,0 +1,7 @@
+proautomation-assistant/.venv/
+proautomation-assistant/models/*.gguf
+proautomation-assistant/models/*.gguf.part
+proautomation-assistant/data/vector_store/
+__pycache__/
+*.pyc
+.DS_Store
